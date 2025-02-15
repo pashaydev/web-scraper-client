@@ -10,21 +10,30 @@
 	import { goto } from '$app/navigation';
 	import { Constants } from '$lib/constants';
 	import tippy from 'tippy.js';
+	import { page } from '$app/stores';
+	import { browser } from '$app/environment';
 
 	let searchQuery = $state('');
 	let isLoading = $state(false);
 	let isDeepLoading = $state(false);
-	let searchResults = $state(null);
+
+	type SearchResult = {
+		title: string;
+		snippet: string;
+		link: string;
+		inner_content: string;
+		source: string;
+	};
+
+	let formattedResults = $state<string>('');
+	let allResults = $state<SearchResult[]>([]);
+
 	let error = $state(null);
-	let searchHistory = $state<HistoryRecord[]>([]);
-	let pagination = $state<Pagination>({
-		cur: 0,
-		maxPerPage: 10,
-		total: 0
-	});
-	function setPagination(p: Pagination) {
-		pagination = { ...pagination, ...p };
-	}
+	let suggestionsOpen = $state(false);
+
+	type SearchTab = 'formatted' | 'raw';
+
+	let selectedTab = $state<SearchTab>('formatted');
 	let suggestions = $state([]);
 	let markedLib = $state(null);
 
@@ -33,6 +42,19 @@
 	$effect(() => {
 		isButtonDisabled = searchQuery.length < 3 || isLoading || isDeepLoading;
 	});
+
+	// Update URL function
+	function updateURL(query: string) {
+		if (browser) {
+			const url = new URL(window.location.href);
+			if (query) {
+				url.searchParams.set('search', query);
+			} else {
+				url.searchParams.delete('search');
+			}
+			history.replaceState({}, '', url.toString());
+		}
+	}
 
 	async function performQuickSearch() {
 		isLoading = true;
@@ -48,18 +70,11 @@
 
 			if (response.ok) {
 				const result = await response.json();
-				searchResults = result.formatted_result;
-
-				addToSearchHistory({
-					query: searchQuery,
-					type: 'quick',
-					timestamp: Date.now(),
-					results: searchResults
-				});
+				allResults = result.results;
+				formattedResults = result.formatted_result;
 			} else {
 				if (response.status === 401) {
 					goto('/auth');
-					// window.location.href = '/auth';
 				}
 
 				if (response.status === 429) {
@@ -98,26 +113,16 @@
 
 			if (response.ok) {
 				const result = await response.json();
-				searchResults = result.formatted_result;
+				allResults = result.results;
+				formattedResults = result.formatted_result;
 			} else {
 				throw new Error(response.statusText);
 			}
-
-			addToSearchHistory({
-				query: searchQuery,
-				type: 'deep',
-				timestamp: Date.now(),
-				results: searchResults
-			});
 		} catch (err) {
 			error = 'An error occurred during deep search. Please try again.';
 		} finally {
 			isDeepLoading = false;
 		}
-	}
-
-	function addToSearchHistory(searchItem) {
-		searchHistory = [searchItem, ...searchHistory];
 	}
 
 	function handleSubmit(e: Event, type: 'quick' | 'deep') {
@@ -135,8 +140,8 @@
 
 	async function getSuggestions(e) {
 		const searchTerm = e.target.value;
-
 		searchQuery = searchTerm;
+		updateURL(searchTerm);
 
 		const response = await fetch(`${Constants.unbornApiUrl}/api/suggestions?q=${searchTerm}`);
 		const xmlString = await response.text();
@@ -147,42 +152,97 @@
 		);
 	}
 
-	// function handleClickToHistory(hR) {
-	// 	searchResults = markedLib?.(hR.results) || '';
-	// 	searchQuery = hR.query;
-	// 	window.scrollTo({
-	// 		top: 0,
-	// 		behavior: 'smooth'
-	// 	});
-	// }
+	const cache = new Map<string, any>();
+
+	let viewedHref = $state({ href: '', res: null });
+
+	async function fetchLinkPreview(url: string) {
+		// Check if the data is in cache
+		if (cache.has(url)) {
+			return cache.get(url);
+		}
+
+		// If not in cache, fetch the data
+		const response = await fetch(`https://api.microlink.io?url=${encodeURIComponent(url)}`);
+		const data = await response.json();
+
+		// Store in cache
+		cache.set(url, data);
+
+		return data;
+	}
 
 	function hoverOnLink(event: MouseEvent) {
 		// @ts-ignore
 		if (event.target?.href) {
 			const linkEl = event.target as HTMLLinkElement;
+
 			tippy(linkEl, {
 				async onCreate(instance) {
-					const response = await fetch(
-						`https://api.microlink.io?url=${encodeURIComponent(linkEl.href)}`
-					);
-					const data = await response.json();
-					instance.setContent(`
-      <div class="p-4">
-        <img src="${data.data.image.url}" class="w-full h-32 object-cover" />
-        <h3 class="font-bold mt-2">${data.data.title}</h3>
-        <p class="text-sm">${data.data.description}</p>
-      </div>
-    `);
+					try {
+						let data: any;
+
+						// Use cached data if available for the same href
+						if (viewedHref.href === linkEl.href && viewedHref.res) {
+							data = viewedHref.res;
+						} else {
+							data = await fetchLinkPreview(linkEl.href);
+						}
+
+						viewedHref.res = data;
+						viewedHref.href = linkEl.href;
+
+						instance.setContent(`
+                        <div class="p-4 relative z-10">
+                            <img src="${data.data.image.url}" class="w-full h-32 object-cover" />
+                            <h3 class="font-bold mt-2">${data.data.title}</h3>
+                            <p class="text-sm">${data.data.description}</p>
+                        </div>
+                    `);
+					} catch (err) {
+						console.error(err);
+					}
 				},
 				allowHTML: true,
-				interactive: true
+				interactive: true,
+				arrow: false,
+				onHide() {}
 			});
 		}
 	}
 
+	function clickToPage(e: MouseEvent) {
+		if ((e.target as HTMLElement)?.id !== 'searchInput') {
+			suggestionsOpen = false;
+		}
+	}
+
+	function cleanupOldCache(maxAge: number = 1000 * 60 * 60) {
+		// Default 1 hour
+		const now = Date.now();
+		cache.forEach((value, key) => {
+			if (now - value.timestamp > maxAge) {
+				cache.delete(key);
+			}
+		});
+	}
+
 	$effect(() => {
 		document.addEventListener('mousemove', hoverOnLink);
-		return () => document.removeEventListener('mousemove', hoverOnLink);
+		document.addEventListener('click', clickToPage);
+
+		// Optional: Setup periodic cache cleanup
+		const cleanupInterval = setInterval(() => cleanupOldCache(), 1000 * 60 * 30); // Clean every 30 minutes
+
+		return () => {
+			document.removeEventListener('mousemove', hoverOnLink);
+			document.removeEventListener('click', clickToPage);
+			clearInterval(cleanupInterval);
+		};
+	});
+
+	$effect(() => {
+		updateURL(searchQuery);
 	});
 
 	// Lifecycle
@@ -191,12 +251,18 @@
 			try {
 				const authToken = localStorage.getItem('authToken');
 				if (!authToken) {
-					// window.location.href = '/auth';
 					goto('/auth');
 					return;
 				}
 
-				document.title = 'Scrapper';
+				// Get search query from URL
+				const searchParam = $page.url.searchParams.get('search');
+				if (searchParam) {
+					searchQuery = searchParam;
+				}
+
+				const { marked } = await import('marked');
+				markedLib = marked;
 
 				try {
 					const tippy = (await import('tippy.js')).default;
@@ -204,36 +270,6 @@
 				} catch (err) {
 					console.log(err);
 				}
-
-				const { marked } = await import('marked');
-				markedLib = marked;
-
-				const token = localStorage.getItem('authToken');
-
-				const response = await fetch(`${Constants.unbornApiUrl}/api/search-history`, {
-					method: 'GET',
-					headers: {
-						Authorization: `Bearer ${token}`
-					}
-				});
-
-				if (response.status === 401) {
-					// window.location.href = '/auth';
-					// goto('/auth');
-					// return;
-				}
-
-				const history = (await response.json()) || [];
-				pagination = { ...pagination, total: history.length };
-
-				history.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-				searchHistory = history.map((hR) => ({
-					query: hR.query,
-					type: hR.action_name === 'scrapper' ? 'quick' : 'deep',
-					timestamp: new Date(hR.created_at).getTime(),
-					results: hR.results
-				}));
 			} catch (err) {
 				console.error(err);
 			}
@@ -241,6 +277,19 @@
 
 		init();
 	});
+
+	function initializeResultTooltips() {
+		const tooltipElements = document.querySelectorAll('[data-tippy-content]');
+		tooltipElements.forEach((element) => {
+			tippy(element, {
+				allowHTML: true,
+				interactive: true,
+				theme: 'custom',
+				placement: 'right',
+				maxWidth: 300
+			});
+		});
+	}
 </script>
 
 <div class="min-h-screen w-full bg-black text-gray-100">
@@ -258,10 +307,14 @@
 					<div class="search-buttons-container flex flex-col gap-3 sm:flex-row">
 						<div class="relative flex-1">
 							<Textarea
+								id="searchInput"
 								onkeydown={(e) => {
 									if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
 										handleSubmit(e, 'quick');
 									}
+								}}
+								onfocus={() => {
+									suggestionsOpen = true;
 								}}
 								onblur={(e) => {
 									e.target.style.height = 'auto';
@@ -273,14 +326,15 @@
 								required
 							/>
 
-							{#if suggestions.length > 0}
+							{#if suggestions.length > 0 && suggestionsOpen}
 								<div
 									class="suggestions w-ful mt-[0.5rem] h-[8rem] max-h-[8rem] overflow-y-scroll rounded-md border border-slate-700 p-1"
 								>
 									{#each suggestions as suggestion, idx}
 										<Button
 											variant="ghost"
-											onclick={() => {
+											onclick={(e) => {
+												e.stopPropagation();
 												searchQuery = suggestion;
 												suggestions = [];
 											}}
@@ -337,7 +391,7 @@
 					</div>
 				{/if}
 
-				{#if !searchResults && !error && !(isLoading || isDeepLoading)}
+				{#if !formattedResults && !error && !(isLoading || isDeepLoading)}
 					<div class="py-6 text-center sm:py-8">
 						<p class="text-slate-400">
 							{searchQuery?.trim()?.length > 3
@@ -351,25 +405,101 @@
 					<div class="py-6 text-center sm:py-8">
 						<p class="text-slate-400">Scrapping the web for get you info</p>
 					</div>
-				{:else if searchResults}
-					<div
-						class="markdown prose prose-invert my-4 max-w-none space-y-4 text-sm sm:my-6 sm:text-base"
-					>
-						{@html markedLib?.(searchResults)?.replace(
-							/<a /g,
-							'<a target="_blank" rel="noopener noreferrer" '
-						)}
+				{:else if formattedResults}
+					<div class="flex gap-2 align-middle">
+						<Button
+							size="sm"
+							variant={selectedTab === 'formatted' ? 'secondary' : 'ghost'}
+							class="relative max-sm:w-full"
+							onclick={() => (selectedTab = 'formatted')}
+							disabled={isButtonDisabled}
+						>
+							Formatted
+						</Button>
+
+						<Button
+							size="sm"
+							variant={selectedTab !== 'formatted' ? 'secondary' : 'ghost'}
+							class="relative max-sm:w-full"
+							onclick={() => (selectedTab = 'raw')}
+							disabled={isButtonDisabled}
+						>
+							Raw
+						</Button>
 					</div>
+					{#if selectedTab === 'formatted'}
+						<div
+							class="markdown prose prose-invert my-4 max-w-none space-y-4 text-sm sm:my-6 sm:text-base"
+						>
+							{@html markedLib?.(formattedResults)?.replace(
+								/<a /g,
+								'<a target="_blank" rel="noopener noreferrer" '
+							)}
+						</div>
+					{/if}
+					{#if selectedTab === 'raw'}
+						<div class="my-5 space-y-6">
+							{#each allResults as result}
+								<div
+									class="relative rounded-sm border border-gray-200 bg-white p-6 shadow-sm backdrop-blur-2xl transition-shadow hover:z-10 hover:shadow-md dark:border-gray-700 dark:bg-gray-800/40"
+								>
+									<div class="flex items-start justify-between">
+										<div class="flex-1">
+											<!-- Source URL -->
+											<div class="mb-1 text-sm text-gray-600 dark:text-gray-400">
+												{result.source}
+											</div>
+
+											<!-- Title with link -->
+											<a
+												href={result.link}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="mb-2 block text-xl font-semibold text-blue-600 hover:underline dark:text-blue-400"
+											>
+												{result.title}
+											</a>
+
+											<!-- Snippet -->
+											<p class="text-gray-700 dark:text-gray-300">
+												{result?.snippet}
+											</p>
+										</div>
+
+										<!-- Info button with tooltip -->
+										{#if result.inner_content}
+											<button
+												class="ml-4 rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+												use:tippy={{
+													content: result.inner_content,
+													allowHTML: true,
+													interactive: true,
+													theme: 'custom',
+													placement: 'right',
+													maxWidth: 300
+												}}
+											>
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													class="h-5 w-5"
+													viewBox="0 0 20 20"
+													fill="currentColor"
+												>
+													<path
+														fill-rule="evenodd"
+														d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+														clip-rule="evenodd"
+													/>
+												</svg>
+											</button>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
 				{/if}
 			</div>
-
-			<!-- <History
-				disabled={isLoading || isDeepLoading}
-				history={searchHistory}
-				{handleClickToHistory}
-				{pagination}
-				{setPagination}
-			/> -->
 		</div>
 	</main>
 </div>

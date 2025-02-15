@@ -51,7 +51,6 @@
 	}
 
 	async function handleLogin(e) {
-		debugger;
 		e.preventDefault();
 		try {
 			isLoading = true;
