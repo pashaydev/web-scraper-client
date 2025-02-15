@@ -3,7 +3,7 @@
 
 	import Button from '../components/ui/button.svelte';
 	import AnimatedText from '../components/ui/animated-text.svelte';
-	import History from './History.svelte';
+	// import History from '../components/ui/History.svelte';
 	import type { HistoryRecord, Pagination } from './types';
 	import LogoAnimated from '../components/ui/logo-animated.svelte';
 	import Textarea from '../components/ui/textarea.svelte';

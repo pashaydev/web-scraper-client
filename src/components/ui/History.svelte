@@ -1,8 +1,8 @@
 <script lang="ts">
 	import Fuse from 'fuse.js';
-	import Button from '../components/ui/button.svelte';
-	import Input from '../components/ui/input.svelte';
-	import type { HistoryRecord, Pagination } from './types';
+	import Button from './button.svelte';
+	import Input from './input.svelte';
+	import type { HistoryRecord, Pagination } from '../../routes/types';
 
 	type $$props = {
 		history: HistoryRecord[];
