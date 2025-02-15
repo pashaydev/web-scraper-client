@@ -160,6 +160,26 @@
 				console.error(err);
 			});
 	});
+
+	async function handleGoogleLogin(e) {
+		try {
+			e.stopPropagation();
+			// Redirect to backend OAuth endpoint
+			window.location.href = `${Constants.apiUrl}/auth/google`;
+		} catch (err) {
+			console.error(err);
+		}
+	}
+
+	async function handleGithubLogin(e) {
+		try {
+			e.stopPropagation();
+			// Redirect to backend OAuth endpoint
+			window.location.href = `${Constants.apiUrl}/auth/github`;
+		} catch (err) {
+			console.error(err);
+		}
+	}
 </script>
 
 <div style={{ cursor: isLoading ? 'wait' : '' }} class="min-h-screen w-full bg-black text-gray-100">
@@ -232,6 +252,11 @@
 							Login
 						</Button>
 					</form>
+
+					<div class="mt-2 flex w-full items-center justify-center gap-2">
+						<Button onclick={handleGithubLogin} variant="outline" size="sm">Github</Button>
+						<Button onclick={handleGoogleLogin} variant="outline" size="sm">Google</Button>
+					</div>
 				</div>
 
 				<!-- Divider -->

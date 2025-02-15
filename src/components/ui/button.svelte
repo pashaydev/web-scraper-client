@@ -4,7 +4,7 @@
 	import classnames from 'classnames';
 
 	const buttonVariants = cva(
-		'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+		'inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
 		{
 			variants: {
 				variant: {
@@ -13,7 +13,7 @@
 					destructive:
 						'bg-[var(--destructive)] text-[var(--destructive-foreground)] shadow-sm hover:bg-[var(--bg-destructive)]',
 					outline:
-						'border border-input bg-[var(--background)] shadow-sm hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)]',
+						'border border-input bg-[var(--background)] text-[var(--accent-foreground)] shadow-sm hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)]',
 					secondary:
 						'bg-[var(--secondary)] text-[var(--secondary-foreground)] shadow-sm hover:bg-[--secondary]',
 					ghost: 'hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)]',

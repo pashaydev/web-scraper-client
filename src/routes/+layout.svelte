@@ -23,6 +23,16 @@
 		}
 	};
 
+	function logout() {
+		// Clear all auth-related data
+		localStorage.removeItem('token');
+		localStorage.removeItem('user');
+		// Any other auth-related cleanup
+
+		// Redirect to login page or home page
+		window.location.href = '/auth';
+	}
+
 	onMount(() => {
 		if (browser) {
 			window.addEventListener('resize', handleResize);
