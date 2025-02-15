@@ -312,7 +312,7 @@
 
 							<span
 								class="max-sm:w-full"
-								data-tippy-content="Deep Search performs an extensive Google search, recursively analyzing all inner links to gather comprehensive information."
+								data-tippy-content="Deep Search performs an extensive DuckDuckGo search, recursively analyzing all inner links to gather comprehensive information."
 							>
 								<Button
 									variant="default"
