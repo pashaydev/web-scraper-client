@@ -9,6 +9,7 @@
 	import Textarea from '../components/ui/textarea.svelte';
 	import { goto } from '$app/navigation';
 	import { Constants } from '$lib/constants';
+	import tippy from 'tippy.js';
 
 	let searchQuery = $state('');
 	let isLoading = $state(false);
@@ -146,14 +147,43 @@
 		);
 	}
 
-	function handleClickToHistory(hR) {
-		searchResults = markedLib?.(hR.results) || '';
-		searchQuery = hR.query;
-		window.scrollTo({
-			top: 0,
-			behavior: 'smooth'
-		});
+	// function handleClickToHistory(hR) {
+	// 	searchResults = markedLib?.(hR.results) || '';
+	// 	searchQuery = hR.query;
+	// 	window.scrollTo({
+	// 		top: 0,
+	// 		behavior: 'smooth'
+	// 	});
+	// }
+
+	function hoverOnLink(event: MouseEvent) {
+		// @ts-ignore
+		if (event.target?.href) {
+			const linkEl = event.target as HTMLLinkElement;
+			tippy(linkEl, {
+				async onCreate(instance) {
+					const response = await fetch(
+						`https://api.microlink.io?url=${encodeURIComponent(linkEl.href)}`
+					);
+					const data = await response.json();
+					instance.setContent(`
+      <div class="p-4">
+        <img src="${data.data.image.url}" class="w-full h-32 object-cover" />
+        <h3 class="font-bold mt-2">${data.data.title}</h3>
+        <p class="text-sm">${data.data.description}</p>
+      </div>
+    `);
+				},
+				allowHTML: true,
+				interactive: true
+			});
+		}
 	}
+
+	$effect(() => {
+		document.addEventListener('mousemove', hoverOnLink);
+		return () => document.removeEventListener('mousemove', hoverOnLink);
+	});
 
 	// Lifecycle
 	$effect(() => {
