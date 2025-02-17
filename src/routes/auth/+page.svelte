@@ -131,8 +131,6 @@
 	}
 
 	onMount(async () => {
-		document.title = 'Authentication';
-
 		const UnicornStudio = await import('../../lib/unicorn-studio.js');
 
 		UnicornStudio.default
@@ -189,6 +187,10 @@
 		}
 	}
 </script>
+
+<head>
+	<title>Authentication</title>
+</head>
 
 <div style={{ cursor: isLoading ? 'wait' : '' }} class="min-h-screen w-full bg-black text-gray-100">
 	<!-- <div

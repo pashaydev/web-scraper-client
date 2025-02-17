@@ -1,10 +1,7 @@
 <script lang="ts">
 	import 'tippy.js/dist/tippy.css';
-
 	import Button from '../components/ui/button.svelte';
 	import AnimatedText from '../components/ui/animated-text.svelte';
-	// import History from '../components/ui/History.svelte';
-	import type { HistoryRecord, Pagination } from './types';
 	import LogoAnimated from '../components/ui/logo-animated.svelte';
 	import Textarea from '../components/ui/textarea.svelte';
 	import { goto } from '$app/navigation';
@@ -277,20 +274,11 @@
 
 		init();
 	});
-
-	function initializeResultTooltips() {
-		const tooltipElements = document.querySelectorAll('[data-tippy-content]');
-		tooltipElements.forEach((element) => {
-			tippy(element, {
-				allowHTML: true,
-				interactive: true,
-				theme: 'custom',
-				placement: 'right',
-				maxWidth: 300
-			});
-		});
-	}
 </script>
+
+<head>
+	<title>Scraper</title>
+</head>
 
 <div class="min-h-screen w-full bg-black text-gray-100">
 	<main class="relative z-10 container mx-auto py-4 sm:py-6 lg:py-8">
@@ -299,7 +287,7 @@
 				class="main-title animate-fade-in-out mb-4 flex justify-center gap-[0.5rem] border-b-2 border-transparent pb-2 text-center align-middle text-2xl font-bold tracking-tight sm:mb-8 sm:text-3xl"
 			>
 				<LogoAnimated isLoading={isLoading || isDeepLoading} />
-				<AnimatedText text="Scrapper" />
+				<AnimatedText text="Scraper" />
 			</h1>
 
 			<div class="rounded-xl bg-black px-2 shadow-2xl sm:py-6">
@@ -350,7 +338,7 @@
 						<div class="flex items-start gap-2 align-middle">
 							<span
 								class="max-sm:w-full"
-								data-tippy-content="Quick Search performs parallel searches across Google, Bing, and DuckDuckGo, combining results and using AI to format them into a comprehensive summary."
+								data-tippy-content="Quick Search performs parallel searches across Bing, and DuckDuckGo, combining results and using AI to format them into a comprehensive summary."
 							>
 								<Button
 									variant="default"
@@ -468,6 +456,7 @@
 
 										<!-- Info button with tooltip -->
 										{#if result.inner_content}
+											<!-- svelte-ignore a11y_consider_explicit_label -->
 											<button
 												class="ml-4 rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
 												use:tippy={{
