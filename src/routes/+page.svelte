@@ -225,14 +225,14 @@
 	}
 
 	$effect(() => {
-		document.addEventListener('mousemove', hoverOnLink);
+		// document.addEventListener('mousemove', hoverOnLink);
 		document.addEventListener('click', clickToPage);
 
 		// Optional: Setup periodic cache cleanup
 		const cleanupInterval = setInterval(() => cleanupOldCache(), 1000 * 60 * 30); // Clean every 30 minutes
 
 		return () => {
-			document.removeEventListener('mousemove', hoverOnLink);
+			// document.removeEventListener('mousemove', hoverOnLink);
 			document.removeEventListener('click', clickToPage);
 			clearInterval(cleanupInterval);
 		};
